@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Queries</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/themes/prism.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/components/prism-sql.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        pre {
+            background-color: #f9f9f9; /* very light grey background */
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap; /* preserve whitespace */
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        code {
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 13px;
+        }
+        .token.comment,
+        .token.prolog,
+        .token.doctype,
+        .token.cdata {
+            color: green;
+        }
+        .token.punctuation {
+            color: black;
+        }
+        .token.keyword {
+            color: blue;
+        }
+        .token.operator {
+            color: grey;
+        }
+        .token.string {
+            color: red;
+        }
+        .token.function {
+            color: #C71585; /* Darker pink */
+        }
+        .token.variable {
+            color: black; /* Variables in black */
+        }
+    </style>
+</head>
+<body>
+    <h1>SQL Queries</h1>
+    <pre><code class="language-sql">
+--------------------------------------------------
+---Uploading Shapefiles to SQL Server Using GDAL---
+---------------------------------------------------
+
+--Step 1: Download and Install GDAL
+--Download the package gdal-3.8.5-1930-x64-core.msi from GDAL Releases (http://www.gisinternals.com/release.php)
+
+-- I downloaded the GIS information from STATS NZ: 
+-- https://datafinder.stats.govt.nz/layer/92201-meshblock-higher-geographies-2018-high-definition/--  53,589 meshblocks-- exported to shapefile &quot;.shp&quot; 
+-- https://datafinder.stats.govt.nz/layer/111225-meshblock-higher-geographies-2023-high-definition/ --  53,589 meshblocks -- exported to shapefile &quot;.shp&quot; 
+-- https://datafinder.stats.govt.nz/table/115227-geographic-areas-table-2024/ -- 57.5K Rows, extract CSV, this will be our fact table is it contains meshblock information for 2024,2023,2018 and etc..
+-- https://datafinder.stats.govt.nz/layer/87883-district-health-board-2015/--District -- Health Board 2015, Polygon Layer, 22 Polygons -- exported to shapefile &quot;.shp&quot; 
+
+
+-- we will not be looking at meshblock 2024 as there is not a higher geography high definition version out there (at this time) along wtih other 2024 data such as territorial authority and etc....
+
+-- For detailed geographic analysis, precise mapping, or local-level planning: Use Meshblock  High Definition (HD). This will provide the most accurate boundary data.
+-- For applications involving higher-level geographic units but still requiring detailed boundaries: Use Meshblock 2018 High Definition Higher Geography. This is beneficial when working with aggregated data that still needs high-definition boundary accuracy.
+-- Hence we will be looking 
+--at meshblock with High Definition along with Higher Geographies. 
+
+
+--Step 2: Check the Original Shapefile
+--Navigate to the directory containing the shapefile: (in gdal)
+--cd C:\SQL\GIS\meshblock-higher-geographies-2023-high-definition
+
+--Check the shapefile information: (in gdal)
+--ogrinfo -al -so &quot;meshblock-higher-geographies-2023-high-definition.shp&quot;
+--Note the EPSG code for NZGD2000, which is EPSG:2193.
+
+--Step 3: Upload Shapefile to SQL Server
+--Use ogr2ogr to upload the shapefile:
+-- ogr2ogr -f &quot;MSSQLSpatial&quot; &quot;MSSQL:server=LAPTOP-FCEBDCHS\SQLEXPRESS;database=spatial;trusted_connection=yes&quot; &quot;meshblock-higher-geographies-2023-high-definition.shp&quot; -nln &quot;mb2023hd&quot; -a_srs &quot;EPSG:2193&quot; -progress
+
+--Step 4: Upload CSV File to SQL Server
+--Use ogr2ogr to upload the CSV file:
+--ogr2ogr -f &quot;MSSQLSpatial&quot; &quot;MSSQL:driver={ODBC Driver 17 for SQL Server};server=LAPTOP-FCEBDCHS\SQLEXPRESS;database=spatial;trusted_connection=yes&quot; &quot;C:\SQL\GIS\statsnz-geographic-areas-table-2024\geographic-areas-table-2024.csv&quot; -nln &quot;GeographicAreas2024&quot; -overwrite
+--This concise guide includes all the necessary commands and steps to upload shapefiles and CSV files into SQL Server using GDAL.
+
+
+---------------------------
+-- Data types adjustments --
+---------------------------
+
+-- Using meshblock 2023 known as [dbo].[mb2018hd] as an example: (this can also be used for dhb2015,mb2018 -- just a demo)
+ALTER TABLE [dbo].[mb2023hd]
+ALTER COLUMN ogr_geometry GEOMETRY,
+ALTER COLUMN mb2023_v1_ VARCHAR(7) NOT NULL,
+ALTER COLUMN land_area_ DECIMAL(18, 2) NOT NULL,
+ALTER COLUMN area_sq_km DECIMAL(18, 4) NOT NULL,
+ALTER COLUMN shape_leng DECIMAL(18, 2) NOT NULL,
+ALTER COLUMN sa12023_v1 VARCHAR(7) NOT NULL,
+ALTER COLUMN sa22023_v1 VARCHAR(6) NOT NULL,
+ALTER COLUMN sa22023__1 VARCHAR(100) NOT NULL,
+ALTER COLUMN sa22023__2 VARCHAR(100) NOT NULL,
+ALTER COLUMN sa32023_v1 VARCHAR(5) NOT NULL;
+
+-- Identify the existing primary key on the mb2023hd table:
+EXEC sp_pkeys @table_name = &#x27;mb2023hd&#x27;, @table_owner = &#x27;dbo&#x27;;
+
+SELECT CONSTRAINT_NAME
+FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+WHERE TABLE_NAME = &#x27;geographic_areas_table_2024&#x27; AND CONSTRAINT_TYPE = &#x27;PRIMARY KEY&#x27;;
+
+-- Verify the Existence of the Spatial Index
+SELECT name AS IndexName, type_desc AS IndexType
+FROM sys.indexes
+WHERE object_id = OBJECT_ID(&#x27;dbo.mb2023hd&#x27;);
+
+-- Drop the existing spatial index
+DROP INDEX ogr_dbo_mb2023hd_ogr_geometry_sidx ON [dbo].[mb2023hd];
+
+-- Drop the existing primary key constraint
+ALTER TABLE [dbo].[mb2023hd]
+DROP CONSTRAINT PK_mb2023hd;
+
+ALTER TABLE [dbo].[geographic_areas_table_2024]
+DROP CONSTRAINT PK_geographicareas2024;
+
+-- Ensure columns are not nullable
+ALTER TABLE [dbo].[mb2023hd]
+ALTER COLUMN mb2023_v1_ VARCHAR(7) NOT NULL;
+
+ALTER TABLE [dbo].[geographic_areas_table_2024]
+ALTER COLUMN mb2023_code VARCHAR(7) NOT NULL;
+
+-- Add the primary key constraint
+ALTER TABLE [dbo].[mb2023hd]
+ADD CONSTRAINT pk_mb2023_v1_ PRIMARY KEY (mb2023_v1_);
+
+ALTER TABLE [dbo].[geographic_areas_table_2024]
+ADD CONSTRAINT pk_mb2024_code PRIMARY KEY (mb2024_code);
+
+-- Add Check Constraints for Non-negative Values
+ALTER TABLE [dbo].[mb2023hd]
+ADD CONSTRAINT chk_land_area_non_negative CHECK (land_area_ &gt;= 0),
+ADD CONSTRAINT chk_area_sq_km_non_negative CHECK (area_sq_km &gt;= 0),
+ADD CONSTRAINT chk_shape_leng_non_negative CHECK (shape_leng &gt;= 0);
+
+-- Drop the ogr_fid column
+ALTER TABLE [dbo].[mb2023hd]
+DROP COLUMN ogr_fid;
+
+ALTER TABLE [dbo].[geographic_areas_table_2024]
+DROP COLUMN ogr_fid;
+
+
+--------------------------------
+-- DHB_2015 Adjustments --
+--------------------------------
+
+-- Verify the Existence of the Spatial Index
+SELECT name AS IndexName, type_desc AS IndexType
+FROM sys.indexes
+WHERE object_id = OBJECT_ID(&#x27;dbo.[dhb2015]&#x27;);
+
+-- Drop the existing spatial index
+DROP INDEX ogr_dbo_dhb2015_ogr_geometry_sidx ON [dbo].[dhb2015];
+
+-- Remove primary key and ogr_fid column
+ALTER TABLE [dbo].[dhb2015]
+DROP CONSTRAINT PK_dhb2015,
+DROP COLUMN ogr_fid;
+
+-- Ensure columns are not nullable
+ALTER TABLE [dbo].[dhb2015]
+ALTER COLUMN [dhb2015_co] CHAR(2) NOT NULL;
+
+-- Remove duplicate values and create a new dimension table
+SELECT *
+INTO dhb2015_dim
+FROM [dhb2015]
+WHERE dhb2015_co &lt;&gt; &#x27;99&#x27;;
+
+-- Merge the rows with dhb2015_code = &#x27;99&#x27;
+INSERT INTO dhb2015_dim (ogr_geometry, dhb2015_co, dhb2015_na, shape_leng)
+SELECT 
+  geometry::UnionAggregate(ogr_geometry) AS ogr_geometry,
+  &#x27;99&#x27; AS dhb2015_code,
+  MAX(dhb2015_na) AS dhb2015_na,
+  SUM(shape_leng) AS shape_leng
+FROM [dhb2015]
+WHERE dhb2015_co = &#x27;99&#x27;;
+
+-- Set dhb2015_code as the primary key in the new dimension table
+ALTER TABLE dhb2015_dim
+ADD PRIMARY KEY (dhb2015_co);
+
+-- Verify the new dimension table
+SELECT * FROM dhb2015_dim;
+
+-- Making [dhb2015_co] the primary key
+ALTER TABLE [dbo].[dhb2015]
+ADD CONSTRAINT pk_dhb2015 PRIMARY KEY (dhb2015_co);
+
+--------------------------------
+-- mb2018 Adjustments --
+--------------------------------
+
+-- Verify the Existence of the Spatial Index
+SELECT name AS IndexName, type_desc AS IndexType
+FROM sys.indexes
+WHERE object_id = OBJECT_ID(&#x27;dbo.[mb2018hd]&#x27;);
+
+-- Drop the existing spatial index
+DROP INDEX ogr_dbo_mb2018hd_ogr_geometry_sidx ON [dbo].mb2018hd;
+
+-- Remove primary key and ogr_fid column
+ALTER TABLE [dbo].mb2018hd
+DROP CONSTRAINT PK_mb2018hd,
+DROP COLUMN ogr_fid;
+
+-- Ensure columns are not nullable
+ALTER TABLE [dbo].[mb2018hd]
+ALTER COLUMN mb2018_v1_ VARCHAR(7) NOT NULL;
+
+-- Making [mb2018_v1_] the primary key
+ALTER TABLE [dbo].[mb2018hd]
+ADD CONSTRAINT PK_mb2018hd PRIMARY KEY (mb2018_v1_);
+
+------------------------------
+--  foreign key constraints --
+------------------------------
+
+-- Alter the column mb2018_code in geographic_areas_table_2024 to match mb2018_v1_ in mb2018hd
+ALTER TABLE geographic_areas_table_2024
+ALTER COLUMN mb2018_code VARCHAR(7); -- Adjust the data type accordingly
+
+-- Alter the column dhb2015_code in geographic_areas_table_2024 to match dhb2015_co in dhb2015
+ALTER TABLE geographic_areas_table_2024
+ALTER COLUMN dhb2015_code CHAR(2); -- Adjust the data type accordingly
+
+-- For the mb2018hd table
+ALTER TABLE geographic_areas_table_2024
+ADD CONSTRAINT fk_mb2018
+FOREIGN KEY (mb2018_code)
+    REFERENCES mb2018hd (mb2018_v1_);
+
+-- For the dhb2015 table (dhb2015_dim)
+ALTER TABLE geographic_areas_table_2024
+ADD CONSTRAINT fk_dhb2015_dim
+FOREIGN KEY (dhb2015_code)
+    REFERENCES dhb2015_dim (dhb2015_co);
+
+-- ------------------
+--   Indexing   --
+-- ------------------
+
+-- Create a unique index on the mb2023_v1_00 column of the mb2023hd table
+CREATE UNIQUE INDEX mbcode2023_index
+ON [dbo].[mb2023hd]([mb2023_v1_00]);
+
+-- Create a unique index on the mb2018_v1_00 column of the mb2018hd table
+CREATE UNIQUE INDEX mbcode2018_index
+ON [dbo].[mb2018hd](mb2018_v1_00);
+
+
+-- ---------------------------
+-- Creating a Spatial Index --
+-- ---------------------------
+
+-- Finding the bounding box coordinates ymin, ymax, xmin, xmax
+-- The bounding box is used to create an efficient spatial index
+
+-- The following query calculates the bounding box coordinates
+
+--ogr_geometry:
+--is the spatial column containing geometry data, such as points, lines, or polygons.
+-- .STEnvelope():  
+--returns the minimum bounding rectangle (or bounding box) for each geometry. The bounding box is the smallest rectangle that completely contains the geometry.
+--geometry::UnionAggregate(geom.STEnvelope()):
+-- UnionAggregate combines all bounding boxes into a single geometry that represents the overall bounding box for all geometries in the column. It creates a single bounding box that contains all individual bounding boxes.
+--.STEnvelope() (second call):
+--After combining all bounding boxes, the STEnvelope() method is called again on the resulting aggregate geometry to ensure it is treated as a single bounding box.
+--.STPointN(1):
+--The STPointN method returns a specific point from the bounding box. Bounding boxes are represented as a sequence of points:
+--STPointN(1): Bottom-left corner (X1, Y1)
+--STPointN(2): Bottom-right corner (X2, Y2)
+--STPointN(3): Top-right corner (X3, Y3)
+--STPointN(4): Top-left corner (X4, Y4)
+--STPointN(1) returns the first point of the bounding box, which is the bottom-left corner.
+--.STX:
+--STX property retrieves the X-coordinate of the specified point. In this case, it retrieves the X-coordinate of the bottom-left corner of the bounding box.
+
+
+SELECT
+    geometry::UnionAggregate(ogr_geometry.STEnvelope()).STEnvelope().STPointN(1).STX AS X1, -- Bottom-left X
+    geometry::UnionAggregate(ogr_geometry.STEnvelope()).STEnvelope().STPointN(2).STX AS X2, -- Bottom-right X
+    geometry::UnionAggregate(ogr_geometry.STEnvelope()).STEnvelope().STPointN(3).STX AS X3, -- Top-right X
+    geometry::UnionAggregate(ogr_geometry.STEnvelope()).STEnvelope().STPointN(4).STX AS X4, -- Top-left X
+    geometry::UnionAggregate(ogr_geometry.STEnvelope()).STEnvelope().STPointN(1).STY AS Y1, -- Bottom-left Y
+    geometry::UnionAggregate(ogr_geometry.STEnvelope()).STEnvelope().STPointN(2).STY AS Y2, -- Bottom-right Y
+    geometry::UnionAggregate(ogr_geometry.STEnvelope()).STEnvelope().STPointN(3).STY AS Y3, -- Top-right Y
+    geometry::UnionAggregate(ogr_geometry.STEnvelope()).STEnvelope().STPointN(4).STY AS Y4  -- Top-left Y
+FROM [dbo].[mb2023hd];
+
+
+-- Create a spatial index on the geom column of the mb2023hd table
+-- The BOUNDING_BOX values should be adjusted based on the actual bounding box calculated above
+CREATE SPATIAL INDEX spatialIndex_on_geometry_col2023
+ON [dbo].[mb2023hd]([ogr_geometry])
+WITH (
+    BOUNDING_BOX = (
+        xmin = 1067061.19960022,
+        ymin = 4701317.18130016,
+        xmax = 2523319.50220013,
+        ymax = 6242140.29589987
+    )
+);
+--------------------------------------------------------
+--- Seeing if numbers are 7 digits (leading zeros) -----
+--------------------------------------------------------
+
+SELECT 
+    CASE 
+        WHEN LEN(CAST([mb2023_code] AS VARCHAR)) &lt; 7 THEN &#x27;Less than 7 digits&#x27;
+        WHEN LEN(CAST([mb2023_code] AS VARCHAR)) = 7 THEN &#x27;Exactly 7 digits&#x27;
+        ELSE &#x27;More than 7 digits&#x27;
+    END AS DigitCategory,
+    COUNT(*) AS TotalCount
+FROM 
+    [dbo].[geographic_areas_table_2024]
+GROUP BY 
+    CASE 
+        WHEN LEN(CAST([mb2023_code] AS VARCHAR)) &lt; 7 THEN &#x27;Less than 7 digits&#x27;
+        WHEN LEN(CAST([mb2023_code] AS VARCHAR)) = 7 THEN &#x27;Exactly 7 digits&#x27;
+        ELSE &#x27;More than 7 digits&#x27;
+    END;
+
+-- This can be used to update leading zeros if there are issues with the csv file be transfered
+--UPDATE [dbo].[geographic_areas_table_2024]
+--SET    
+  --    [mb2023_code]= format(convert(int,[mb2022_code]),&#x27;000000#&#x27;),
+    --  [mb2018_code] = format(convert(int,[mb2018_code]),&#x27;000000#&#x27;),
+      --[mb2013_code]= format(convert(int,[mb2013_code]),&#x27;000000#&#x27;),
+      --[mb2011_code]= format(convert(int,[mb2011_code]),&#x27;000000#&#x27;);
+----
+----
+
+
+---------------------------------
+-- Comparing table before join --
+---------------------------------
+
+--
+-- Meshblock 2023 Summary
+SELECT
+    &#x27;mb2023hd&#x27; AS TableName,
+    COUNT(*) AS &#x27;Number of rows for all columns&#x27;,
+    COUNT(DISTINCT [mb2023_v1_]) AS &#x27;Unique Mesh codes&#x27;,
+    MIN([mb2023_v1_]) AS &#x27;Lowest mesh code value&#x27;,
+    MAX([mb2023_v1_]) AS &#x27;Highest mesh code value&#x27;,
+    SUM(IIF([mb2023_v1_] IS NULL, 1, 0)) AS &#x27;Null count&#x27;,
+    SUM(CASE WHEN [mb2023_v1_] = &#x27;&#x27; THEN 1 ELSE 0 END) AS &#x27;Blank space count&#x27;
+FROM 
+    [dbo].[mb2023hd]
+
+UNION ALL
+
+-- Meshblock 2018 Summary
+SELECT
+    &#x27;mb2018hd&#x27; AS TableName,
+    COUNT(*) AS &#x27;Number of rows for all columns&#x27;,
+    COUNT(DISTINCT [mb2018_v1_]) AS &#x27;Unique Mesh codes&#x27;,
+    MIN([mb2018_v1_]) AS &#x27;Lowest mesh code value&#x27;,
+    MAX([mb2018_v1_]) AS &#x27;Highest mesh code value&#x27;,
+    SUM(IIF([mb2018_v1_] IS NULL, 1, 0)) AS &#x27;Null count&#x27;,
+    SUM(CASE WHEN [mb2018_v1_] = &#x27;&#x27; THEN 1 ELSE 0 END) AS &#x27;Blank space count&#x27;
+FROM 
+    [dbo].[mb2018hd];
+
+
+-- Geograpical Areas table (can also test it with other variables)
+SELECT
+       COUNT(*) as &#x27;Number of rows for all columns&#x27;,
+       COUNT(distinct ft.mb2023_code) AS &#x27;Unique Mesh codes&#x27;,
+       MIN(ft.mb2023_code) AS &#x27;Lowest mesh code value&#x27;,
+       MAX(ft.mb2023_code) AS &#x27;Highest mesh code value&#x27;,
+       SUM(IIF(ft.mb2023_code is null, 1,0)) AS &#x27;Null count&#x27;,
+         SUM(CASE WHEN ft.mb2023_code=&#x27;&#x27; THEN 1 ELSE 0 END) AS &#x27;Blank_space_count&#x27;
+  FROM [dbo].[geographic_areas_table_2024]as ft;
+
+ ----------------------------------------------------------------
+ --  Table joining geograpical areas table and Meshblock 2023  --
+ ----------------------------------------------------------------
+
+-- Left Join Mesh 2023 with geographical areas table
+SELECT
+    mb.*,
+    ft.*
+INTO #mesh2023_leftjoin_geo_table
+FROM [dbo].[mb2023hd] AS mb
+LEFT JOIN [dbo].[geographic_areas_table_2024] AS ft
+ON mb.[mb2023_v1_] = ft.[mb2023_code];
+
+-- Left Join geographical areas table with Mesh 2023
+SELECT
+    ft.*, mb.*
+INTO #geo_table_leftjoin_mesh2023
+FROM [dbo].[geographic_areas_table_2024] AS ft
+LEFT JOIN [dbo].[mb2023hd] AS mb
+ON ft.[mb2023_code] = mb.[mb2023_v1_];
+
+-- Investigate Nulls from left join
+SELECT TOP 10 * FROM #mesh2023_leftjoin_geo_table;
+SELECT TOP 10 * FROM #geo_table_leftjoin_mesh2023;
+
+-- Summary for #mesh2023_leftjoin_geo_table
+SELECT
+    COUNT(*) AS &#x27;Number of rows for all columns&#x27;,
+    COUNT(DISTINCT ft.[mb2023_code]) AS &#x27;Unique Mesh codes&#x27;,
+    MIN(ft.[mb2023_code]) AS &#x27;Lowest mesh code value&#x27;,
+    MAX(ft.[mb2023_code]) AS &#x27;Highest mesh code value&#x27;,
+    SUM(IIF(ft.[MB2023_code] IS NULL, 1, 0)) AS &#x27;Null count&#x27;,
+    SUM(CASE WHEN ft.[MB2023_code] = &#x27;&#x27; THEN 1 ELSE 0 END) AS &#x27;Blank space count&#x27;
+FROM #mesh2023_leftjoin_geo_table AS ft;
+
+-- Summary for #geo_table_leftjoin_mesh2023
+SELECT
+    COUNT(*) AS &#x27;Number of rows for all columns&#x27;,
+    COUNT(DISTINCT ft.[mb2023_v1_]) AS &#x27;Unique Mesh codes&#x27;,
+    MIN(ft.[mb2023_v1_]) AS &#x27;Lowest mesh code value&#x27;,
+    MAX(ft.[mb2023_v1_]) AS &#x27;Highest mesh code value&#x27;,
+    SUM(IIF(ft.[mb2023_v1_] IS NULL, 1, 0)) AS &#x27;Null count&#x27;,
+    SUM(CASE WHEN ft.[mb2023_v1_] = &#x27;&#x27; THEN 1 ELSE 0 END) AS &#x27;Blank space count&#x27;
+FROM #geo_table_leftjoin_mesh2023 AS ft;
+
+-- Viewing the NULL values in the geo-table
+SELECT ft.*
+FROM #geo_table_leftjoin_mesh2023 AS ft
+WHERE [mb2023_v1_] IS NULL OR [mb2023_v1_] = &#x27;&#x27;; -- could be nulls from oceanic areas
+
+-- Meshblock 2023 contains geo-table
+SELECT * INTO mb2023_geotable2024 FROM #geo_table_leftjoin_mesh2023;
+
+
+
+-----------------------------------------------
+---- Refining Meshblock within Waiakto DHB ----
+-----------------------------------------------
+
+ -- Filtering Geograpical fact table to &quot;waiakto&quot; via the raw mb2023 file--
+
+ SELECT ft.*
+ INTO mesh2023_northland_dhb
+ FROM mb2023_geotable2024 AS ft
+ WHERE ft.DHB2015_name = &#x27;Northland&#x27;
+
+ SELECT COUNT(*) FROM mb2023_geotable2024
+ SELECT COUNT(*) FROM mesh2023_northland_dhb
+
+ --------------------------------
+ -- Disolving meshblock 2023
+ --------------------------------
+ 
+----
+-- SA1 2018 within Northland DHB
+----
+ SELECT
+       mesh.SA12018_code
+       ,COUNT(distinct mesh.SA12018_code) AS meshblock_count
+       ,geometry::UnionAggregate([ogr_geometry]).MakeValid() AS GEO
+INTO sa12018_northland_dhb
+FROM mesh2023_northland_dhb AS mesh
+GROUP BY mesh.SA12018_code
+
+SELECT * FROM sa12018_northland_dhb
+ 
+-----
+ -- SA2 2018 within Northland DHB
+-----
+
+ SELECT
+     mesh.[SA22018_code]
+    ,mesh.[SA22018_name]
+    ,COUNT(distinct mesh.[mb2023_code]) AS meshblock_count
+    ,geometry::UnionAggregate([ogr_geometry]).MakeValid() AS GEO
+INTO sa22018_northland_dhb
+FROM mesh2023_northland_dhb AS mesh
+GROUP BY mesh.[SA22018_code],mesh.[SA22018_name];
+
+SELECT * FROM sa22018_northland_dhb
+
+ -- Meshblock 2018 within Northland DHB --- Disolve Meshblock 2023
+SELECT
+     row_number() OVER(ORDER BY mb2018_code ASC) AS fid,
+     mesh.[mb2018_code],
+     COUNT(distinct mesh.[mb2018_code]) AS meshblock_count,
+     geometry::UnionAggregate([ogr_geometry]).MakeValid() AS GEO
+INTO mb2018_dissolved_from_mb2023_northland_DHB
+FROM mesh2023_northland_dhb AS mesh
+GROUP BY mesh.[mb2018_code];
+
+SELECT COUNT(*) FROM mesh2023_northland_dhb
+SELECT COUNT(*) FROM mb2018_dissolved_from_mb2023_northland_DHB
+
+-----
+-- Meshblock 2018 HD within Northland (from statsnz which is not dissolved)
+-----
+
+--Left Join Mesh 2023 with geographical areas table
+
+SELECT
+    mb.*,
+    ft.*
+INTO #mesh2018_leftjoin_geo_table
+FROM [dbo].[mb2018hd] AS mb
+LEFT JOIN [dbo].[geographic_areas_table_2024] AS ft
+ON mb.[mb2018_v1_] = ft.[mb2023_code];
+
+SELECT * INTO mb2018_geotable2024 FROM #mesh2018_leftjoin_geo_table;
+
+SELECT COUNT(*) FROM mb2018_geotable2024
+
+SELECT COUNT(*) FROM mesh2023_northland_dhb
+SELECT COUNT(*) FROM mb2018_dissolved_from_mb2023_northland_DHB
+SELECT COUNT(*) FROM mesh2018_northland_dhb
+
+-- dissolve the raw Meshblock 2018 HD within Northland
+
+ SELECT ft.*
+ INTO mesh2018_northland_dhb
+ FROM mb2018_geotable2024 AS ft
+ WHERE ft.DHB2015_name = &#x27;Northland&#x27;
+
+ SELECT * FROM mesh2018_northland_dhb
+
+--- Meshblock 2018 whole of New Zealand (by dissolving mb2023_geotable2024) ---
+SELECT                                                           
+     mesh.[mb2018_code]
+    ,COUNT(distinct mesh.[mb2018_code]) AS meshblock_count
+    ,geometry::UnionAggregate([ogr_geometry]).MakeValid() AS GEO
+INTO #Meshblock2018_dissolve
+FROM mb2023_geotable2024 AS mesh
+GROUP BY mesh.[mb2018_code];
+
+SELECT row_number() OVER(ORDER BY mb2018_code ASC) AS fid,*
+INTO mesh2018_dissolve
+FROM #Meshblock2018_dissolve;
+
+SELECT COUNT(*) from mesh2018_dissolve -- 53589 rows
+
+--Change Column Name in mesh2018_dissolve
+EXEC sp_rename &#x27;mesh2018_dissolve.mb2018_code&#x27;, &#x27;mb2018_code_dissolve&#x27;, &#x27;COLUMN&#x27;;
+
+---
+--- testing dissolved meshblock 2018 for all of nz (from mb2023) within northland dhb
+
+-- table joining with geographic_areas_table_2024
+SELECT
+    mb.*,
+    ft.*
+INTO #mesh2018_leftjoin_geo_table_dissolve2
+FROM mesh2018_dissolve AS mb
+LEFT JOIN [dbo].[geographic_areas_table_2024] AS ft
+ON mb.[mb2018_code_dissolve] = ft.[mb2018_code];
+
+-- filtering table join with Northland 
+ SELECT ft.*
+ INTO mesh2018_all_nz_dissolve_from_mb2023
+ FROM #mesh2018_leftjoin_geo_table_dissolve2 AS ft
+ WHERE ft.DHB2015_name = &#x27;Northland&#x27;
+
+-----------------------------------------------------------
+-- comparing Meshblock Areas 
+------------------------------------------------------------
+
+-- Joining mesh2018 disolve with mesh2018 HD
+select COUNT(*) FROM mesh2023_northland_dhb -- Raw stats nz 2023 meshblock table join with geotable 2024 and filtering it to northland dhb. Output:2534
+select COUNT(*) FROM mesh2018_northland_dhb -- Raw stats nz 2018 meshblock table join with geotable 2024 and filtering it to northland dhb. Output:2328
+select COUNT(*) FROM mb2018_dissolved_from_mb2023_northland_DHB -- dissolving from the already filtered 2023 meshblock known as &quot;mesh2023_northland_dhb&quot; from northland dhb. Output:2406
+select COUNT(*) FROM mesh2018_all_nz_dissolve_from_mb2023 -- dissolving to mesh 2018 from meshblock 2023 and  filtering it into northland dhb. Output: 2534
+-- 
+
+-- (a) The raw mesh2023 which was filterd to northland dhb seems to have the same number of rows as the dissolved meshblock 2018 of New zealand from meshblock 2023 which was filtering it into northland dhb 
+-- (b) The filtered  2023 northland dhb meshblock (mesh2023_northland_dhb) which is then dissolved to 2018 northland dhb meshblock seems to have the different number of rows comapired to  (a)
+-- (c) The Raw stats nz 2018 meshblock which  was filterd to northland dhb seems to be different to all of the dissolved meshblock 2018 from the raw stats nz 2023 meshblock data. 
+ 
+
+ -----
+ ---  comparing mb2018 dissolve (from mb2023) and raw mb2018 (from stats nz) for all of New Zealand
+ -----
+
+-- since the mesh2018_all_nz_dissolve_from_mb2023 and mesh2023_northland_dhb are the same, I wanted to compare to see if the size is the same. 
+
+-- we will find the Diff between mb2018 dissolve (from mb2023) and raw mb2018 (from stats nz) for all of New Zealand
+SELECT * FROM mesh2018_dissolve -- mb2018_code_dissolve, GEO -- 53589
+SELECT * FROM mb2018hd -- -- mb2018_v1_, landwater_ -- 53589
+
+-- converting geometry to area
+ALTER TABLE mesh2018_dissolve ADD area_sqm_2018_dissolve AS GEO.STArea() --- GEO -- geomery 
+ALTER TABLE mb2018hd ADD area_sqm_2018 AS ogr_geometry.STArea() -- ogr_geometry -- geomery
+
+---- Area difference
+-- EPSG:2193 is in meters hence convertion is in sq meters
+
+-- 
+
+SELECT
+    mb2018hd.area_sqm_2018,
+    mb2018_d.area_sqm_2018_dissolve AS mb2018_d_sqm,
+    mb2018hd.area_sqm_2018 - mb2018_d.area_sqm_2018_dissolve AS mbdiff_2018hd_2018dissolve,
+    mb2018_d.area_sqm_2018_dissolve - mb2018hd.area_sqm_2018 AS mbdiff_2018dissolve_2018hd,
+    mb2018_d.mb2018_code_dissolve,
+    mb2018hd.mb2018_v1_,
+    mb2018hd.landwater_,
+    mb2018hd.ogr_geometry
+INTO mbdiff_2018dissolve_2023hd_allnz
+FROM mb2018hd
+FULL OUTER JOIN mesh2018_dissolve AS mb2018_d
+ON mb2018hd.mb2018_v1_ = mb2018_d.mb2018_code_dissolve;
+
+-------------
+
+-- summarizing the output
+
+SELECT 
+    COUNT(*) AS total_rows,  -- Counts the total number of rows in the table
+    COUNT(CASE WHEN mbdiff_2018hd_2018dissolve IS NULL OR mbdiff_2018dissolve_2018hd IS NULL THEN 1 END) AS mbdiff_2018hd_2018dissolve_or_mbdiff_2018dissolve_2018hd_null,  -- Counts rows where mbdiff_2018hd_2018dissolve or mbdiff_2018dissolve_2018hd is null
+    COUNT(CASE WHEN mbdiff_2018hd_2018dissolve IS NULL THEN 1 END) AS mbdiff_2018hd_2018dissolve_null,  -- Counts rows where mbdiff_2018hd_2018dissolve is null
+    COUNT(CASE WHEN mbdiff_2018dissolve_2018hd IS NULL THEN 1 END) AS mbdiff_2018dissolve_2018hd_null,  -- Counts rows where mbdiff_2018dissolve_2018hd is null
+    COUNT(CASE WHEN mb2018_v1_ IS NULL OR mb2018_code_dissolve IS NULL THEN 1 END) AS mb2018_v1_or_mb2018_code_dissolve_null,  -- Counts rows where mb2018_v1_ or mb2018_code_dissolve is null
+    COUNT(CASE WHEN mb2018_v1_ IS NULL THEN 1 END) AS mb2018_v1_null,  -- Counts rows where mb2018_v1_ is null
+    COUNT(CASE WHEN mb2018_code_dissolve IS NULL THEN 1 END) AS mb2018_code_dissolve_null  -- Counts rows where mb2018_code_dissolve is null
+FROM mbdiff_2018dissolve_2023hd_allnz;
+
+
+-- 16 NULL rows for both mbdiff_2018hd_2018dissolve IS NULL or/and mbdiff_2018dissolve_2018hd IS NULL seems to be island, oceanic and other hence possible NULL area.
+-- both meshblock code for mb2018_v1_ and/or mb2018_code_dissolve seems to be add up to the total number of rows for the 2 input and 1 output table of 53589. 
+
+
+-----
+-- compairing Raw meshblock 2018 (stats nz) with Raw 2018 Meshblock (from stats nz)
+-----
+
+ALTER TABLE [dbo].[mb2023hd]  ADD area_sqm_2023 AS ogr_geometry.STArea() --- ogr_geometry -- geomery 
+ALTER TABLE [dbo].[mb2018hd]  ADD area_sqm_2018 AS ogr_geometry.STArea() -- ogr_geometry -- geomery
+
+
+SELECT
+    mb2023hd.area_sqm_2023,
+    mb2018hd.area_sqm_2018,
+    mb2023hd.area_sqm_2023 - mb2018hd.area_sqm_2018 AS mbdiff_2023_2018,
+    mb2018hd.area_sqm_2018 - mb2023hd.area_sqm_2023 AS mbdiff_2018_2023,
+    mb2023hd.mb2023_v1_,
+    mb2018hd.mb2018_v1_,
+    mb2023hd.sa22023__1,
+    mb2023hd.iua2023__1,
+    mb2023hd.landwater_
+INTO mb_2018_2023_diff
+FROM mb2023hd
+FULL OUTER JOIN mb2018hd
+ON mb2023hd.mb2023_v1_ = mb2018hd.mb2018_v1_;
+
+-- Quick summary
+
+SELECT
+    (SELECT COUNT(*) FROM [dbo].[mb2018hd]) AS count_mb2018hd, -- 53589 rows
+    (SELECT COUNT(*) FROM [dbo].[mb2023hd]) AS count_mb2023hd, -- 53589 rows
+    (SELECT COUNT(*) FROM mb_2018_2023_diff) AS count_mb_2018_2023_diff; -- 59388
+
+
+-- Need to investigate why mb_2018_2023_diff has an extra &#x27;5,799&#x27; rows (during a outer table join)
+
+
+SELECT 
+    COUNT(*) AS total_rows,  -- Counts the total number of rows in the table
+    COUNT(CASE WHEN mbdiff_2023_2018 != 0 OR mbdiff_2023_2018 IS NULL THEN 1 END) AS mbdiff_2023_2018_nonzero_or_null,  -- Counts rows where mbdiff_2023_2018 is non-zero or null
+    COUNT(CASE WHEN mbdiff_2018_2023 IS NULL OR mbdiff_2023_2018 IS NULL THEN 1 END) AS mbdiff_2018_2023_or_mbdiff_2023_2018_null,  -- Counts rows where mbdiff_2018_2023 or mbdiff_2023_2018 is null
+    COUNT(CASE WHEN mbdiff_2023_2018 IS NULL THEN 1 END) AS mbdiff_2023_2018_null,  -- Counts rows where mbdiff_2023_2018 is null
+    COUNT(CASE WHEN mbdiff_2018_2023 IS NULL THEN 1 END) AS mbdiff_2018_2023_null,  -- Counts rows where mbdiff_2018_2023 is null
+    COUNT(CASE WHEN mb2023_v1_ IS NULL OR mb2018_v1_ IS NULL THEN 1 END) AS mb2023_v1_or_mb2018_v1_null,  -- Counts rows where mb2023_v1_ or mb2018_v1_ is null
+    COUNT(CASE WHEN mb2023_v1_ IS NULL THEN 1 END) AS mb2023_v1_null,  -- Counts rows where mb2023_v1_ is null
+    COUNT(CASE WHEN mb2018_v1_ IS NULL THEN 1 END) AS mb2018_v1_null,  -- Counts rows where mb2018_v1_ is null
+    COUNT(DISTINCT mb2023_v1_) AS distinct_mb2023_v1,  -- Counts distinct values of mb2023_v1_
+    COUNT(DISTINCT mb2018_v1_) AS distinct_mb2018_v1  -- Counts distinct values of mb2018_v1_
+FROM 
+    mb_2018_2023_diff;
+
+
+-- the extra  5799 rows are due to the missing/null meshblock 2018 code (mb2018_v1_). 
+-- both mesh 2023 mb2023_v1_ code and mesh 2018 mb2023_v1_ code seem to have 53589 distinct and total number of rows.   
+
+
+------------------------------------------------------------
+-- Drop the Existing Function if it Exists
+------------------------------------------------------------
+IF OBJECT_ID(&#x27;dbo.eliminateslivers&#x27;, &#x27;FN&#x27;) IS NOT NULL
+    DROP FUNCTION dbo.eliminateslivers;
+GO
+
+------------------------------------------------------------
+-- Function Definition: Remove Slivers from Geometry
+------------------------------------------------------------
+
+-- The function dbo.eliminateslivers is created to clean up geometries by removing small, unwanted polygons known as slivers.
+-- Slivers can be created when using spatial functions like STIntersection, especially with complex or noisy datasets.
+-- Slivers are often very small and can interfere with spatial analysis, so removing them helps produce cleaner results.
+
+CREATE FUNCTION dbo.eliminateslivers(@g geometry, @minArea FLOAT = 0.0001)
+-- The @minArea parameter sets the minimum area threshold for slivers. Geometries with an area smaller than this will be considered slivers and removed.
+-- The default value is set to 0.0001 square units. This value can be adjusted based on the specific requirements of your dataset.
+RETURNS geometry
+AS
+BEGIN
+    -- Initialize an empty geometry to store the result
+    DECLARE @h geometry = geometry::STGeomFromText(&#x27;POLYGON EMPTY&#x27;, @g.STSrid);
+    
+    -- Use a table variable to store valid geometries temporarily
+    DECLARE @geomTable TABLE (geom geometry);
+    INSERT INTO @geomTable (geom)
+    SELECT @g.STGeometryN(number) FROM master..spt_values WHERE type = &#x27;P&#x27; AND number BETWEEN 1 AND @g.STNumGeometries();
+
+    -- Combine all geometries that are not slivers into @h
+    SELECT @h = geometry::UnionAggregate(geom)
+    FROM @geomTable
+    WHERE geom.STArea() &gt; @minArea; -- Threshold for slivers (adjust as needed)
+
+    RETURN @h;
+END;
+GO
+
+-- Notes on geom.STArea() &gt; @minArea:
+-- This line filters out geometries (slivers) that have an area smaller than @minArea.
+-- Threshold @minArea (default 0.0001) specifies the minimum area for a geometry to be retained.
+-- In the context of NZTM2000, which uses meters as units:
+--   - A threshold of 0.0001 square meters is very small (0.01 cm²).
+--   - Increasing the threshold (e.g., 1 square meter) will remove larger slivers.
+--   - Decreasing the threshold will retain smaller geometries.
+-- Example: Setting @minArea to 1 would remove any polygon smaller than 1 square meter.
+
+------------------------------------------------------------
+-- Clipping Meshblock 2023 within Auckland DHB Boundary and Removing Slivers
+------------------------------------------------------------
+
+-- Step 1: Select Auckland DHB boundary into a temporary table
+-- We need to isolate the boundary geometry for Auckland DHB to use it for clipping other geometries.
+SELECT n.*
+INTO #auckland_dhb
+FROM [dbo].[dhb2015] AS n
+WHERE n.DHB2015_na = &#x27;Auckland&#x27;;
+
+-- Verify the Auckland DHB boundary to ensure it has been correctly loaded.
+SELECT * FROM #auckland_dhb;
+
+-- Step 2: Verify the Meshblock 2023 table to ensure it has the required geometries.
+SELECT * FROM [dbo].[mb2023hd];
+
+-- Step 3: Clip mb2023hd within the Auckland DHB boundary (with and without slivers removed)
+
+-- Without Removing Slivers
+-- This query clips the Meshblock 2023 geometries to the Auckland DHB boundary without removing slivers.
+SELECT 
+    mb2023hd.sa22023_v1, -- Example of selecting specific columns from mb2023hd
+    mb2023hd.mb2023_v1_, -- Example of selecting specific columns from mb2023hd
+    mb2023hd.ogr_geometry.STIntersection(auckland_dhb.ogr_geometry) AS ClippedGeometry
+INTO #mb2023hd_clipped_no_slivers
+FROM 
+    mb2023hd
+CROSS JOIN 
+    (SELECT ogr_geometry FROM #auckland_dhb) AS auckland_dhb
+WHERE 
+    mb2023hd.ogr_geometry.STIntersects(auckland_dhb.ogr_geometry) = 1;
+
+-- Explanation:
+-- CROSS JOIN: Produces all possible combinations of rows from mb2023hd and auckland_dhb.
+-- STIntersects: Checks if the geometries intersect, returning 1 (true) if they do, and 0 (false) if they don&#x27;t.
+-- STIntersection: Returns the geometric intersection (clipping) of mb2023hd.ogr_geometry and auckland_dhb.ogr_geometry.
+-- This result does not remove slivers, which are small unwanted polygons that can interfere with spatial analysis.
+
+-- With Removing Slivers
+-- This query uses the dbo.eliminateslivers function to clean the clipped geometries by removing slivers.
+SELECT 
+    mb2023hd.sa22023_v1, -- Example of selecting specific columns from mb2023hd
+    mb2023hd.mb2023_v1_, -- Example of selecting specific columns from mb2023hd
+    dbo.eliminateslivers(
+        mb2023hd.ogr_geometry.STIntersection(auckland_dhb.ogr_geometry),
+        1 -- Example threshold: 1 square meter (adjust as needed)
+    ) AS ClippedGeometry
+INTO #mb2023hd_clipped_with_slivers
+FROM 
+    mb2023hd
+CROSS JOIN 
+    (SELECT ogr_geometry FROM #auckland_dhb) AS auckland_dhb
+WHERE 
+    mb2023hd.ogr_geometry.STIntersects(auckland_dhb.ogr_geometry) = 1;
+
+-- Explanation:
+-- This query follows the same process as above but applies the dbo.eliminateslivers function to remove slivers.
+-- This results in cleaner geometries, which are better for analysis and visualization.
+
+-- Step 4: Compare results
+-- Verify and compare the results of both queries to see the difference in output.
+SELECT * FROM #mb2023hd_clipped_no_slivers;
+SELECT * FROM #mb2023hd_clipped_with_slivers;
+
+-- Clean up temporary tables
+DROP TABLE #mb2023hd_clipped_no_slivers;
+DROP TABLE #mb2023hd_clipped_with_slivers;
+DROP TABLE #auckland_dhb;
+
+------------------------------------------------------------
+-- Aggregating Meshblock Geometries by SA2 2023 Codes and Removing Slivers
+------------------------------------------------------------
+
+-- Step 1: Aggregating and dissolving geometries by SA2 2023
+SELECT
+    mesh.sa22023_v1, -- SA2 2023 code
+    COUNT(DISTINCT mesh.mb2023_v1_) AS meshblock_count, -- Counting unique meshblock codes
+    geometry::UnionAggregate([ogr_geometry]).MakeValid() AS GEO -- Aggregating and making the geometry valid
+INTO #sa22023
+FROM [dbo].[mb2023hd] AS mesh
+GROUP BY mesh.sa22023_v1, mesh.sa22023__1; -- Grouping by SA2 2023 code
+
+-- Explanation:
+-- This step aggregates meshblock geometries by the SA2 2023 code.
+-- UnionAggregate merges multiple geometries into one, ensuring they form a valid geometry.
+-- The result is stored in a temporary table #sa22023.
+
+-- Step 2: Clip #sa22023 within #auckland_dhb and remove slivers
+-- We are only interested in the clipped geometry, so we do not select the original GEO column.
+SELECT 
+    sa22023.sa22023_v1, 
+    sa22023.meshblock_count, 
+    dbo.eliminateslivers(
+        sa22023.GEO.STIntersection(auckland_dhb.ogr_geometry),
+        1 -- Example threshold: 1 square meter (adjust as needed)
+    ) AS ClippedGeometry -- Clipping the geometries
+INTO #sa22023_clipped
+FROM 
+    #sa22023 AS sa22023
+CROSS JOIN 
+    (SELECT ogr_geometry FROM #auckland_dhb) AS auckland_dhb
+WHERE 
+    sa22023.GEO.STIntersects(auckland_dhb.ogr_geometry) = 1;
+
+-- Explanation:
+-- CROSS JOIN: Combines each row of #sa22023 with each row of auckland_dhb, producing all possible combinations.
+-- STIntersects: Returns 1 (true) if the geometries intersect, 0 (false) otherwise.
+-- Only rows where sa22023.GEO intersects with auckland_dhb.ogr_geometry are included.
+-- STIntersection: Returns the geometric intersection (clipping) of sa22023.GEO and auckland_dhb.ogr_geometry.
+-- eliminateslivers: Function to remove slivers from the clipped geometry.
+-- The result is stored in a new column called ClippedGeometry.
+-- The resulting table is stored in #sa22023_clipped.
+
+-- Step 3: Select records from the clipped result
+SELECT 
+    sa22023_v1, 
+    meshblock_count, 
+    ClippedGeometry
+FROM #sa22023_clipped;
+
+-- This step selects the necessary columns from the clipped result, excluding the original GEO column.
+
+-- Clean up temporary tables
+DROP TABLE #auckland_dhb;
+DROP TABLE #sa22023;
+DROP TABLE #sa22023_clipped;
+
+-- Notes:
+-- 1. The function dbo.eliminateslivers is used to remove small, unwanted polygons (slivers) from geometries.
+-- 2. The default STIntersection function in SQL can produce slivers,
+--    which are small, unwanted geometries that can interfere with spatial analysis.
+-- 3. Slivers can lead to inaccuracies and inefficiencies in spatial queries and visualizations.
+-- 4. By using dbo.eliminateslivers, we ensure the geometries are cleaner and more suitable for analysis.
+-- 5. Temporary tables are used to store intermediate results and are cleaned up at the end to maintain a tidy database environment.
+
+
+
+-- =============================================
+-- Title: Spatial Database Extended Properties Setup
+-- =============================================
+
+-- Description: Script to add extended properties to spatial tables for documentation purposes
+
+
+-- =============================================
+-- Title: Spatial Database Extended Properties Setup
+-- Description: Script to add extended properties to spatial tables 
+--              for documentation purposes
+-- Author: Pawaneet Kaur
+-- Date: 2024-07-05
+-- =============================================
+-- Drop the existing stored procedure if it exists
+IF OBJECT_ID(&#x27;AddExtendedProperties&#x27;, &#x27;P&#x27;) IS NOT NULL
+    DROP PROCEDURE AddExtendedProperties;
+GO
+
+-- Create the stored procedure to add extended properties
+CREATE PROCEDURE AddExtendedProperties
+    @tableName NVARCHAR(128),
+    @description NVARCHAR(4000),
+    @owner NVARCHAR(128),
+    @source NVARCHAR(128),
+    @usageNotes NVARCHAR(4000),
+    @fileType NVARCHAR(128)
+AS
+BEGIN
+    -- Add Description
+    IF NOT EXISTS (SELECT * FROM sys.extended_properties 
+                   WHERE major_id = OBJECT_ID(@tableName) AND name = &#x27;Description&#x27;)
+    BEGIN
+        EXEC sp_addextendedproperty 
+            @name = N&#x27;Description&#x27;, 
+            @value = @description, 
+            @level0type = N&#x27;SCHEMA&#x27;, @level0name = dbo, 
+            @level1type = N&#x27;TABLE&#x27;,  @level1name = @tableName;
+    END
+
+    -- Add Owner
+    IF NOT EXISTS (SELECT * FROM sys.extended_properties 
+                   WHERE major_id = OBJECT_ID(@tableName) AND name = &#x27;Owner&#x27;)
+    BEGIN
+        EXEC sp_addextendedproperty 
+            @name = N&#x27;Owner&#x27;, 
+            @value = @owner, 
+            @level0type = N&#x27;SCHEMA&#x27;, @level0name = dbo, 
+            @level1type = N&#x27;TABLE&#x27;,  @level1name = @tableName;
+    END
+
+    -- Add Source
+    IF NOT EXISTS (SELECT * FROM sys.extended_properties 
+                   WHERE major_id = OBJECT_ID(@tableName) AND name = &#x27;Source&#x27;)
+    BEGIN
+        EXEC sp_addextendedproperty 
+            @name = N&#x27;Source&#x27;, 
+            @value = @source, 
+            @level0type = N&#x27;SCHEMA&#x27;, @level0name = dbo, 
+            @level1type = N&#x27;TABLE&#x27;,  @level1name = @tableName;
+    END
+
+    -- Add Usage Notes
+    IF NOT EXISTS (SELECT * FROM sys.extended_properties 
+                   WHERE major_id = OBJECT_ID(@tableName) AND name = &#x27;Usage Notes&#x27;)
+    BEGIN
+        EXEC sp_addextendedproperty 
+            @name = N&#x27;Usage Notes&#x27;, 
+            @value = @usageNotes, 
+            @level0type = N&#x27;SCHEMA&#x27;, @level0name = dbo, 
+            @level1type = N&#x27;TABLE&#x27;,  @level1name = @tableName;
+    END
+
+    -- Add File Type
+    IF NOT EXISTS (SELECT * FROM sys.extended_properties 
+                   WHERE major_id = OBJECT_ID(@tableName) AND name = &#x27;File Type&#x27;)
+    BEGIN
+        EXEC sp_addextendedproperty 
+            @name = N&#x27;File Type&#x27;, 
+            @value = @fileType, 
+            @level0type = N&#x27;SCHEMA&#x27;, @level0name = dbo, 
+            @level1type = N&#x27;TABLE&#x27;,  @level1name = @tableName;
+    END
+END;
+GO
+
+-- Add extended properties for mb2023hd table
+EXEC AddExtendedProperties 
+    @tableName = &#x27;mb2023hd&#x27;,
+    @description = &#x27;This table stores Meshblock Higher Geographies 2023 (high definition).&#x27;,
+    @owner = &#x27;Project created by Pawaneet Kaur&#x27;,
+    @source = &#x27;Data imported from Stats NZ: https://datafinder.stats.govt.nz/layer/92201-meshblock-higher-geographies-2018-high-definition/&#x27;,
+    @usageNotes = &#x27;This table should be used for analysis of Meshblock coverage areas and associated statistics for 2023.&#x27;,
+    @fileType = &#x27;Shapefile&#x27;;
+
+-- Add extended properties for mb2018hd table
+EXEC AddExtendedProperties 
+    @tableName = &#x27;mb2018hd&#x27;,
+    @description = &#x27;This table stores Meshblock Higher Geographies 2018 (high definition).&#x27;,
+    @owner = &#x27;Project created by Pawaneet Kaur&#x27;,
+    @source = &#x27;Data imported from Stats NZ: https://datafinder.stats.govt.nz/layer/111225-meshblock-higher-geographies-2023-high-definition/&#x27;,
+    @usageNotes = &#x27;This table should be used for analysis of Meshblock coverage areas and associated statistics for 2018.&#x27;,
+    @fileType = &#x27;Shapefile&#x27;;
+
+-- Add extended properties for geographic_areas_table_2024 table
+EXEC AddExtendedProperties 
+    @tableName = &#x27;geographic_areas_table_2024&#x27;,
+    @description = &#x27;This table stores geographic area data for 2024, including Meshblock information for 2024, 2023, and 2018.&#x27;,
+    @owner = &#x27;Project created by Pawaneet Kaur&#x27;,
+    @source = &#x27;Data imported from Stats NZ:https://datafinder.stats.govt.nz/table/115227-geographic-areas-table-2024/ &#x27;,
+    @usageNotes = &#x27;This table should be used for analysis of geographic areas and Meshblock information across multiple years.&#x27;,
+    @fileType = &#x27;CSV&#x27;;
+</code></pre>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const sqlKeywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "EXEC"];
+            const sqlTypes = ["NOT NULL", "GEOMETRY", "DECIMAL"];
+            const sqlFunctions = ["OBJECT_ID", "COUNT", "LEN", "CAST", "MIN", "MAX"];
+            const sqlComments = /(--.*?$)/gm;
+            const sqlStrings = /'([^']*)'/g; // Match anything within single quotes
+            const sqlVariables = /\@[^\s]+/g; // Variables starting with @
+
+            let codeElement = document.querySelector("pre code");
+            let codeText = codeElement.innerHTML;
+
+            // Highlight comments
+            codeText = codeText.replace(sqlComments, '<span class="sql-comment">$1</span>');
+            // Highlight strings
+            codeText = codeText.replace(sqlStrings, '<span class="sql-string">'$1'</span>');
+            // Highlight variables
+            codeText = codeText.replace(sqlVariables, '<span class="sql-variable">$&</span>');
+            // Highlight functions
+            sqlFunctions.forEach(function(func) {
+                let regex = new RegExp(`\b${func}\b`, 'g');
+                codeText = codeText.replace(regex, '<span class="sql-function">$&</span>');
+            });
+            // Highlight keywords
+            sqlKeywords.forEach(function(keyword) {
+                let regex = new RegExp(`\b${keyword}\b`, 'g');
+                codeText = codeText.replace(regex, '<span class="sql-keyword">$&</span>');
+            });
+            // Highlight types
+            sqlTypes.forEach(function(type) {
+                let regex = new RegExp(`\b${type}\b`, 'g');
+                codeText = codeText.replace(regex, '<span class="sql-type">$&</span>');
+            });
+            codeElement.innerHTML = codeText;
+        });
+    </script>
+</body>
+</html>

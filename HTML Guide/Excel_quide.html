@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public Health Data Analysis Guide</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            padding: 20px;
+            max-width: 900px;
+            margin: auto;
+            font-size: 14px;
+        }
+
+        h1, h2, h3, h4, h5 {
+            color: #2c3e50;
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+
+        h1 {
+            font-size: 1.8em;
+        }
+
+        h2 {
+            font-size: 1.5em;
+        }
+
+        h3 {
+            font-size: 1.2em;
+        }
+
+        h4, h5 {
+            font-size: 1em;
+        }
+
+        p, ul, ol {
+            margin: 0.5em 0;
+        }
+
+        ul, ol {
+            margin-left: 1.5em;
+        }
+
+        .code-container {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            overflow: auto;
+        }
+
+        pre {
+            margin: 0;
+            font-family: Consolas, 'Courier New', Courier, monospace;
+            font-size: 12px;
+        }
+
+        code {
+            background: #1e1e1e;
+            color: #dcdcdc;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Public Health Data Analysis Guide</h1>
+
+    <h2>Scenario: Public Health Data Analysis</h2>
+    <p>
+        You are a data analyst working for a public health organization in the Northland region. The organization is
+        conducting a study to analyze the distribution of measles cases across different districts and demographic
+        groups. The study focuses on three key districts in the Northland region: Far North, Whangarei, and Kaipara.
+    </p>
+
+    <h2>Study Requirements</h2>
+    <h3>Gender Distribution</h3>
+    <ul>
+        <li>The study requires an equal number of males and females.</li>
+        <li>A total of 12 records are needed, with 6 males and 6 females.</li>
+    </ul>
+
+    <h3>Age Groups</h3>
+    <ul>
+        <li>The study focuses on two age groups: "&lt; 25 years old" and "&gt; 25 years old".</li>
+        <li>Each gender should have an equal representation of both age groups.</li>
+    </ul>
+
+    <h3>District Distribution</h3>
+    <ul>
+        <li>The TA2023_code should be evenly distributed among the records.</li>
+        <li>Each district code ("001", "002", "003") should be repeated 4 times.</li>
+    </ul>
+
+    <h3>Measles Cases</h3>
+    <ul>
+        <li>The number of measles cases should be randomly generated within specified ranges:</li>
+        <ul>
+            <li>"001" (Far North): 300 to 600 cases</li>
+            <li>"002" (Whangarei): 100 to 600 cases</li>
+            <li>"003" (Kaipara): 200 to 500 cases</li>
+        </ul>
+    </ul>
+
+    <h3>Additional Data</h3>
+    <ul>
+        <li>The study should include district names, area in square kilometers, and geometry data.</li>
+    </ul>
+
+    <h2>1. Excel</h2>
+
+    <h3>a) VBA Script</h3>
+    <p>To use the VBA script, press <code>Alt + F11</code> to open the VBA editor in Excel. Insert a new module and paste the following code:</p>
+    <div class="code-container">
+        <pre><code>Sub GenerateData()
+    Dim ws As Worksheet
+    Dim i As Integer
+    Dim TA2023_code As String
+    Dim Age As String
+    Dim Gender As String
+    Dim MeaslesCases As Integer
+    Dim lookupRange As Range
+    Dim lookupResult As Variant
+
+    On Error GoTo ErrorHandler
+
+    ' Set the worksheet
+    Set ws = ThisWorkbook.Sheets("Sheet1")
+    Set lookupRange = ws.Range("J2:M4")
+
+    ' Fill "Northland" in column A and TA2023_code in column B as text with leading zeros
+    For i = 2 To 13
+        ws.Cells(i, 1).Value = "Northland"
+
+        Select Case i
+            Case 2 To 5
+                ws.Cells(i, 2).Value = "'001" ' Apostrophe makes it text explicitly
+            Case 6 To 9
+                ws.Cells(i, 2).Value = "'002" ' Apostrophe makes it text explicitly
+            Case 10 To 13
+                ws.Cells(i, 2).Value = "'003" ' Apostrophe makes it text explicitly
+        End Select
+    Next i
+
+    ' Generate data for other columns
+    For i = 2 To 13
+        On Error GoTo ErrorHandler
+
+        ' Get the TA2023_code from column B as text
+        TA2023_code = ws.Cells(i, 2).Text
+
+        ' Debug output
+        Debug.Print "Processing row " & i & " with TA2023_code: " & TA2023_code
+
+        ' VLookup to get the TA2023_name
+        lookupResult = Application.VLookup(TA2023_code, lookupRange, 2, False)
+        If IsError(lookupResult) Then
+            MsgBox "VLookup failed for TA2023_code: " & TA2023_code & " in row " & i
+            ws.Cells(i, 3).Value = "N/A"
+        Else
+            ws.Cells(i, 3).Value = lookupResult
+        End If
+
+        ' Set Age and Gender based on row number
+        If (i - 2) Mod 4 < 2 Then
+            Age = "< 25 years old"
+            Gender = "Female"
+        Else
+            Age = "> 25 years old"
+            Gender = "Male"
+        End If
+
+        ' Generate random MeaslesCases based on TA2023_code
+        If TA2023_code = "001" Then
+            MeaslesCases = Int((600 - 300 + 1) * Rnd + 300)
+        ElseIf TA2023_code = "002" Then
+            MeaslesCases = Int((600 - 100 + 1) * Rnd + 100)
+        Else
+            MeaslesCases = Int((500 - 200 + 1) * Rnd + 200)
+        End If
+
+        ' Fill the cells with generated data
+        ws.Cells(i, 4).Value = Age
+        ws.Cells(i, 5).Value = Gender
+        ws.Cells(i, 6).Value = MeaslesCases
+
+        ' VLookup for Area_sqkm and wkt_geom
+        lookupResult = Application.VLookup(TA2023_code, lookupRange, 3, False)
+        If IsError(lookupResult) Then
+            MsgBox "VLookup for Area_sqkm failed for TA2023_code: " & TA2023_code & " in row " & i
+            ws.Cells(i, 7).Value = "N/A"
+        Else
+            ws.Cells(i, 7).Value = lookupResult
+        End If
+
+        lookupResult = Application.VLookup(TA2023_code, lookupRange, 4, False)
+        If IsError(lookupResult) Then
+            MsgBox "VLookup for wkt_geom failed for TA2023_code: " & TA2023_code & " in row " & i
+            ws.Cells(i, 8).Value = "N/A"
+        Else
+            ws.Cells(i, 8).Value = lookupResult
+        End If
+
+        On Error GoTo 0
+    Next i
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "Error in row " & i & ": " & Err.Description
+    On Error GoTo 0
+End Sub</code></pre>
+    </div>
+    <p>Before running the VBA script, set up your Excel sheet as follows:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>A1</th>
+                <th>B1</th>
+                <th>C1</th>
+                <th>D1</th>
+                <th>E1</th>
+                <th>F1</th>
+                <th>G1</th>
+                <th>H1</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>DHB</td>
+                <td>TA2023_code</td>
+                <td>TA2023_name</td>
+                <td>Age</td>
+                <td>Gender</td>
+                <td>Measles Cases</td>
+                <td>Area_sqkm</td>
+                <td>wkt_geom</td>
+            </tr>
+        </tbody>
+    </table>
+    <p>In columns J through M, add the lookup table:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>J</th>
+                <th>K</th>
+                <th>L</th>
+                <th>M</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>TA2023_code</td>
+                <td>TA2023_name</td>
+                <td>Area_sqkm</td>
+                <td>wkt_geom</td>
+            </tr>
+            <tr>
+                <td>001</td>
+                <td>Far North</td>
+                <td>7319.745</td>
+                <td>MultiPolygon(...)</td>
+            </tr>
+            <tr>
+                <td>002</td>
+                <td>Whangarei</td>
+                <td>2855.176</td>
+                <td>MultiPolygon(...)</td>
+            </tr>
+            <tr>
+                <td>003</td>
+                <td>Kaipara</td>
+                <td>3116.315</td>
+                <td>MultiPolygon(...)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>b) Excel Functions</h3>
+    <p>Set up your Excel sheet as shown in the tables above. Then, use the following functions:</p>
+    <p>Under DHB (A1), type "Northland" in A2. Then in A3, add the function:</p>
+    <div class="code-container">
+        <pre><code>=IF(ROW(A3:A13) <= 13, $A$2, "")</code></pre>
+    </div>
+    <p>Under TA2023_code, add the function in B2:</p>
+    <div class="code-container">
+        <pre><code>=IF(ROW(A1)<=4, "001", IF(ROW(A1)<=8, "002", "003"))</code></pre>
+    </div>
+    <p>Under TA2023_name, add the function in C2:</p>
+    <div class="code-container">
+        <pre><code>=VLOOKUP(B2, $J$2:$L$4, 2, FALSE)</code></pre>
+    </div>
+    <p>Under Age, add the function in D2:</p>
+    <div class="code-container">
+        <pre><code>=IF(MOD(ROW()-2, 4) < 2, "&lt; 25 years old", "&gt; 25 years old")</code></pre>
+    </div>
+    <p>Under Gender, add the function in E2:</p>
+    <div class="code-container">
+        <pre><code>=IF(MOD(ROW(), 2) = 0, "Male", "Female")</code></pre>
+    </div>
+    <p>Under Measles Cases, add the function in F2:</p>
+    <div class="code-container">
+        <pre><code>=IF(C2="Far North District", RANDBETWEEN(300, 600), IF(C2="Kaipara District", RANDBETWEEN(100, 500), RANDBETWEEN(100, 600)))</code></pre>
+    </div>
+    <p>Under Area_sqkm, add the function in G2:</p>
+    <div class="code-container">
+        <pre><code>=VLOOKUP(B2, $J$2:$M$4, 3, FALSE)</code></pre>
+    </div>
+    <p>Under wkt_geom, add the function in H2:</p>
+    <div class="code-container">
+        <pre><code>=VLOOKUP(B2, $J$2:$M$4, 4, FALSE)</code></pre>
+    </div>
+
+    <h2>2. R Script</h2>
+    <p>To generate the required dataset using R, follow these steps:</p>
+    <div class="code-container">
+        <pre><code># Load necessary library
+library(openxlsx)
+
+# Create a lookup data frame
+lookup_df <- data.frame(
+  TA2023_code = c("001", "002", "003"),
+  TA2023_name = c("Far North", "Whangarei", "Kaipara"),
+  Area_sqkm = c(7319.745, 2855.176, 3116.315),
+  wkt_geom = c("MultiPolygon((...))", "MultiPolygon((...))", "MultiPolygon((...))"),
+  stringsAsFactors = FALSE
+)
+
+# Initialize an empty data frame for the generated data
+generated_data <- data.frame(
+  DHB = character(),
+  TA2023_code = character(),
+  TA2023_name = character(),
+  Age = character(),
+  Gender = character(),
+  Measles_Cases = integer(),
+  Area_sqkm = numeric(),
+  wkt_geom = character(),
+  stringsAsFactors = FALSE
+)
+
+# Generate the data
+for (i in 1:12) {
+  if (i <= 4) {
+    TA2023_code <- "001"
+  } else if (i <= 8) {
+    TA2023_code <- "002"
+  } else {
+    TA2023_code <- "003"
+  }
+  
+  TA2023_name <- lookup_df$TA2023_name[lookup_df$TA2023_code == TA2023_code]
+  Area_sqkm <- lookup_df$Area_sqkm[lookup_df$TA2023_code == TA2023_code]
+  wkt_geom <- lookup_df$wkt_geom[lookup_df$TA2023_code == TA2023_code]
+  
+  Age <- ifelse((i - 1) %% 4 < 2, "< 25 years old", "> 25 years old")
+  Gender <- ifelse((i - 1) %% 4 < 2, "Female", "Male")
+  
+  if (TA2023_code == "001") {
+    Measles_Cases <- sample(300:600, 1)
+  } else if (TA2023_code == "002") {
+    Measles_Cases <- sample(100:600, 1)
+  } else {
+    Measles_Cases <- sample(200:500, 1)
+  }
+  
+  generated_data <- rbind(generated_data, data.frame(
+    DHB = "Northland",
+    TA2023_code = TA2023_code,
+    TA2023_name = TA2023_name,
+    Age = Age,
+    Gender = Gender,
+    Measles_Cases = Measles_Cases,
+    Area_sqkm = Area_sqkm,
+    wkt_geom = wkt_geom,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# Specify the output file path
+output_file_path <- "C:/Users/Pawaneet Kaur/Desktop/Excel/generated_data.xlsx"
+
+# Write the data to an Excel file
+write.xlsx(generated_data, output_file_path, rowNames = FALSE)
+
+print("Excel file has been created successfully.")</code></pre>
+    </div>
+
+    <h2>3. Python Script</h2>
+    <p>To generate the required dataset using Python, follow these steps:</p>
+    <div class="code-container">
+        <pre><code>import pandas as pd
+import numpy as np
+import os
+
+# Create a lookup DataFrame
+lookup_df = pd.DataFrame({
+    'TA2023_code': ['001', '002', '003'],
+    'TA2023_name': ['Far North', 'Whangarei', 'Kaipara'],
+    'Area_sqkm': [7319.745, 2855.176, 3116.315],
+    'wkt_geom': ['MultiPolygon((...))', 'MultiPolygon((...))', 'MultiPolygon((...))']
+})
+
+# Initialize an empty DataFrame for the generated data
+generated_data = []
+
+# Function to generate random number within a range
+def generate_random_cases(code):
+    if code == '001':
+        return np.random.randint(300, 601)
+    elif code == '002':
+        return np.random.randint(100, 601)
+    elif code == '003':
+        return np.random.randint(200, 501)
+
+# Generate the data
+for i in range(1, 13):
+    if i <= 4:
+        TA2023_code = '001'
+    elif i <= 8:
+        TA2023_code = '002'
+    else:
+        TA2023_code = '003'
+    
+    TA2023_name = lookup_df.loc[lookup_df['TA2023_code'] == TA2023_code, 'TA2023_name'].values[0]
+    Area_sqkm = lookup_df.loc[lookup_df['TA2023_code'] == TA2023_code, 'Area_sqkm'].values[0]
+    wkt_geom = lookup_df.loc[lookup_df['TA2023_code'] == TA2023_code, 'wkt_geom'].values[0]
+    
+    Age = '< 25 years old' if (i - 1) % 4 < 2 else '> 25 years old'
+    Gender = 'Female' if (i - 1) % 4 < 2 else 'Male'
+    
+    Measles_Cases = generate_random_cases(TA2023_code)
+    
+    generated_data.append({
+        'DHB': 'Northland',
+        'TA2023_code': TA2023_code,
+        'TA2023_name': TA2023_name,
+        'Age': Age,
+        'Gender': Gender,
+        'Measles_Cases': Measles_Cases,
+        'Area_sqkm': Area_sqkm,
+        'wkt_geom': wkt_geom
+    })
+
+# Convert the list of dictionaries to a DataFrame
+generated_data_df = pd.DataFrame(generated_data)
+
+# Display the generated data for debugging
+print(generated_data_df)
+
+# Specify the output file path
+output_file_path = os.path.join('C:/Users/Pawaneet Kaur/Desktop/Excel', 'generated_data.xlsx')
+
+# Write the data to an Excel file
+generated_data_df.to_excel(output_file_path, index=False)
+
+print("Excel file has been created successfully.")</code></pre>
+    </div>
+
+    <h2>Using the Generated Data</h2>
+    <h3>Loading Data into a Data Visualization Tool</h3>
+    <p>After generating the data using one of the methods above, you can load the data into your preferred data
+        visualization tool, such as Excel, Power BI, or Tableau, for further analysis and visualization.</p>
+
+    <h3>Step-by-Step Guide for Power BI</h3>
+    <h4>Step 1: Importing Data</h4>
+    <p>Open Power BI and select "Get Data" from the Home tab.</p>
+    <p>Choose "Excel" as the data source and navigate to the location of your generated Excel file.</p>
+    <p>Select the sheet containing your data and click "Load".</p>
+
+    <h4>Step 2: Creating Visualizations</h4>
+    <p>Once the data is loaded, you can create various visualizations to analyze the distribution of measles cases across
+        different districts and demographic groups.</p>
+    <ul>
+        <li><strong>Bar Chart:</strong> To visualize the number of measles cases by district and gender.</li>
+        <li><strong>Pie Chart:</strong> To show the proportion of cases by age group.</li>
+        <li><strong>Map Visualization:</strong> To display the geographic distribution of cases using the provided
+            geometry data.</li>
+    </ul>
+
+    <h4>Step 3: Customizing the Dashboard</h4>
+    <p>Add filters to allow users to interact with the data. For example, you can add slicers for gender, age group, and
+        district.</p>
+    <p>Format the visuals to improve readability and aesthetics by adjusting colors, labels, and titles.</p>
+
+    <h2>Additional Resources</h2>
+    <p>For more detailed instructions on using Power BI, refer to the <a href="https://docs.microsoft.com/en-us/power-bi/guided-learning/">Power BI Guided Learning</a>
+        website.</p>
+    <p>If you encounter any issues or have questions about the scripts provided, consider reaching out to relevant
+        online communities or forums such as Stack Overflow or the R/Python communities.</p>
+
+    <h2>Conclusion</h2>
+    <p>This guide provides multiple approaches to generating and analyzing public health data using Excel VBA, R, and
+        Python. By following the steps outlined above, you can create a comprehensive dataset and visualize it in a tool
+        like Power BI to gain valuable insights into the distribution of measles cases across different districts and
+        demographic groups in the Northland region.</p>
+</body>
+
+</html>

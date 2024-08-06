@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setting up PyQGIS (Standalone) in Windows for Connecting to Platforms such as VSC</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #0055a5;
+        }
+        a {
+            color: #0055a5;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        pre, code {
+            display: block;
+            background-color: #2e2e2e;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+        }
+        code {
+            display: inline;
+            background-color: #2e2e2e;
+            color: #f8f8f2;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 85%;
+        }
+        pre {
+            overflow: auto;
+            margin-bottom: 20px;
+        }
+        .index a {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Setting up PyQGIS (Standalone) in Windows for Connecting to Platforms such as VSC</h1>
+
+        <h2>Index</h2>
+        <div class="index">
+            <a href="#creating-pyqgis3">1. Creating <code>pyqgis3</code></a>
+            <a href="#updating-system-properties">2. Updating System Properties</a>
+            <a href="#setting-up-vsc">3. Setting up Visual Studio Code (VSC)</a>
+            <a href="#explanation-of-the-automation-script">4. Explanation of the Automation Script</a>
+            <a href="#running-automation-scripts">5. Running Automation Scripts</a>
+        </div>
+
+        <h2 id="creating-pyqgis3">1. Creating <code>pyqgis3</code></h2>
+        <p>1. <strong>Navigate to Python Directory:</strong></p>
+        <pre><code>Open File Explorer and go to:
+C:\Program Files\QGIS 3.34.8\apps\Python312
+        </code></pre>
+        <p>2. <strong>Copy and Rename Python Executable:</strong></p>
+        <pre><code>Copy python.exe in the same folder:
+- Right-click python.exe and select Copy.
+- Right-click anywhere in the same folder and select Paste.
+Rename the copied file to pyqgis3.exe:
+- Right-click the copied file named python - Copy.exe (or similar) and select Rename.
+- Rename it to pyqgis3.exe.
+        </code></pre>
+
+        <h2 id="updating-system-properties">2. Updating System Properties</h2>
+        <p>1. <strong>Open System Properties:</strong></p>
+        <pre><code>Press Win + R, type sysdm.cpl, and press Enter.
+Navigate to the Advanced tab.
+Click on Environment Variables.
+        </code></pre>
+        <p>2. <strong>Update User Variables:</strong></p>
+        <pre><code>Path:
+- Add the following paths:
+C:\Program Files\QGIS 3.34.8\apps\Python312\pyqgis3
+C:\Program Files\QGIS 3.34.8\apps\Python312
+
+PYTHONPATH:
+- Add the following paths:
+C:\Program Files\QGIS 3.34.8\apps\qgis-ltr\python
+C:\Program Files\QGIS 3.34.8\apps\qgis-ltr\python\plugins
+C:\Program Files\QGIS 3.34.8\apps\Qt5\plugins
+C:\Program Files\QGIS 3.34.8\apps\gdal\share\gdal
+C:\Program Files\QGIS 3.34.8\apps\Qt5\bin
+        </code></pre>
+        <p><strong>Note:</strong> The paths might be different depending on your QGIS version, but this is the general structure.</p>
+        <p>3. <strong>Test the Setup:</strong></p>
+        <pre><code>Open cmd and type:
+pyqgis3
+
+Then try importing QGIS modules:
+from qgis.core import *
+        </code></pre>
+
+        <h2 id="setting-up-vsc">3. Setting up Visual Studio Code (VSC)</h2>
+        <p>1. <strong>Open Visual Studio Code:</strong></p>
+        <pre><code>Open the Command Palette with Ctrl + Shift + P and type: open workspace settings (JSON).
+        </code></pre>
+        <p>2. <strong>Update Workspace Settings:</strong></p>
+        <pre><code>{
+  "python.autoComplete.extraPaths": [
+    "C:\\Program Files\\QGIS 3.34.8\\apps\\qgis-ltr\\python"
+  ],
+  "python.defaultInterpreterPath": "c:\\Program Files\\QGIS 3.34.8\\apps\\Python312\\pyqgis3.exe",
+  "terminal.integrated.env.windows": {
+    "PATH": "C:\\Program Files\\QGIS 3.34.8\\apps\\Qt5\\bin;C:\\Program Files\\QGIS 3.34.8\\apps\\Python312;C:\\Program Files\\QGIS 3.34.8\\apps\\Python312\\Scripts;%PATH%",
+    "PYTHONPATH": "C:\\Program Files\\QGIS 3.34.8\\apps\\qgis-ltr\\python"
+  },
+  "security.workspace.trust.untrustedFiles": "open",
+  "python.analysis.extraPaths": [
+    "C:\\Program Files\\QGIS 3.34.8\\apps\\qgis-ltr\\python"
+  ],
+  "python.REPL.enableREPLSmartSend": false,
+  "security.workspace.trust.enabled": false,
+  "workbench.editor.enablePreview": false,
+  "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "code-runner.runInTerminal": true,
+  "python.REPL.sendToNativeREPL": false
+}
+        </code></pre>
+        <p><strong>Note:</strong> You may need to adjust the paths according to your installation.</p>
+        <p>3. <strong>Test PyQGIS in Visual Studio Code:</strong></p>
+        <pre><code>Open a new Python file in VSC and run:
+from qgis.core import QgsApplication
+
+Ensure there are no import errors.
+        </code></pre>
+
+        <h2 id="explanation-of-the-automation-script">4. Explanation of the Automation Script</h2>
+        <p>The script automates joining a CSV file with COVID-19 data to a DHB shapefile and visualizing it in QGIS. It performs the following tasks:</p>
+        <ol>
+            <li><strong>Imports Libraries:</strong> Imports required libraries for GIS operations and GUI handling.</li>
+            <li><strong>Configures Logging:</strong> Sets up logging for tracking script progress and errors.</li>
+            <li><strong>Environment Setup:</strong> Sets the <code>PROJ_LIB</code> variable and initializes the QGIS application.</li>
+            <li><strong>Defines File Paths:</strong> Specifies paths to project files, output directories, CSV files, shapefiles, and GeoPackage.</li>
+            <li><strong>Creates Output Directory:</strong> Ensures the output directory exists.</li>
+            <li><strong>Loads Project:</strong> Loads the QGIS project file.</li>
+            <li><strong>Processes DHB Layer:</strong> Loads the DHB layer from the project.</li>
+            <li><strong>Preprocesses CSV Data:</strong> Reads and formats the CSV file, ensuring leading zeros in DHB codes.</li>
+            <li><strong>Loads Shapefile:</strong> Loads the DHB shapefile into a GeoDataFrame.</li>
+            <li><strong>Joins Dataframes:</strong> Joins CSV data to shapefile data based on DHB codes.</li>
+            <li><strong>Saves Joined Data:</strong> Saves the joined data to a GeoPackage.</li>
+            <li><strong>Loads Joined Data into QGIS:</strong> Adds the GeoPackage layer to QGIS.</li>
+            <li><strong>Performs Join in QGIS:</strong> Joins data from the GeoPackage to the DHB layer in QGIS.</li>
+            <li><strong>Checks Join Operation:</strong> Confirms the join was successful by verifying the new field.</li>
+            <li><strong>Validates Data:</strong> Validates the data in the joined field.</li>
+            <li><strong>Creates Renderer:</strong> Sets up a graduated symbol renderer to visualize COVID-19 data.</li>
+            <li><strong>Saves Project:</strong> Saves the modified QGIS project.</li>
+            <li><strong>Exits QGIS:</strong> Properly shuts down the QGIS application.</li>
+        </ol>
+
+        <h2 id="running-automation-scripts">5. Running Automation Scripts</h2>
+        <p>1. <strong>Prepare Your Script:</strong></p>
+        <pre><code>Use your existing script located in C:\GIS\Projects\Automation Task.
+Ensure your virtual environment is activated and the correct Python interpreter is set.
+        </code></pre>
+        <p>2. <strong>Example Script:</strong></p>
+        <pre><code>import os
+import sys
+import logging
+from PyQt5.QtWidgets import QApplication
+from qgis.core import (
+    QgsApplication,
+    QgsProject,
+    QgsVectorLayer,
+    QgsDataSourceUri,
+    QgsVectorLayerJoinInfo,
+    QgsSymbol,
+    QgsGraduatedSymbolRenderer,
+    QgsRendererRange,
+    QgsGradientColorRamp
+)
+import pandas as pd
+import geopandas as gpd
+from PyQt5.QtGui import QColor
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Set the PROJ_LIB environment variable
+os.environ['PROJ_LIB'] = r'C:\Program Files\QGIS 3.34.8\share\proj'
+QgsApplication.setPrefixPath("C:/Program Files/QGIS 3.34.8", True)
+qgs = QgsApplication([], False)
+qgs.initQgis()
+app = QApplication(sys.argv)
+
+# Paths to the files
+project_file_path = r"C:\GIS\QGIS Automation\covid_case.qgz"
+output_dir = r"C:\GIS\QGIS Automation\VSC_files_generated"
+csv_file_path = r"C:\GIS\QGIS Automation\DHB2015.csv"
+shapefile_path = r"C:\GIS\QGIS Automation\DHB2015.shp"
+output_gpkg_path = os.path.join(output_dir, "DHB2015_joined.gpkg")
+
+# Create the output directory if it doesn't exist
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+    logger.info(f"Created directory: {output_dir}")
+
+# Load the project
+project = QgsProject.instance()
+if not project.read(project_file_path):
+    logger.error(f"Failed to read the project file: {project_file_path}")
+    sys.exit(1)
+
+# Load and process DHB2015 layer
+dhb2015_layer = next((layer for layer in project.mapLayers().values() if layer.name() == "DHB2015"), None)
+if dhb2015_layer is None:
+    logger.error("Failed to find the DHB2015 layer in the project")
+    sys.exit(1)
+
+# Load and preprocess CSV data
+try:
+    csv_data = pd.read_csv(csv_file_path)
+    csv_data['DHB2015_code'] = csv_data['DHB2015_code'].astype(str).str.zfill(2).str.strip()
+    csv_data = csv_data.drop_duplicates(subset=['DHB2015_code']).rename(columns={'Covid Case': 'Covid_Case'}).dropna()
+except Exception as e:
+    logger.error(f"Error processing CSV data: {e}")
+    sys.exit(1)
+
+logger.info("CSV data loaded and preprocessed")
+
+# Load the shapefile into a GeoDataFrame
+try:
+    gdf = gpd.read_file(shapefile_path)
+    gdf['DHB2015_Co'] = gdf['DHB2015_Co'].astype(str).str.zfill(2).str.strip()
+except Exception as e:
+    logger.error(f"Error loading shapefile: {e}")
+    sys.exit(1)
+
+logger.info("Shapefile data loaded")
+
+# Join the dataframes
+try:
+    joined_gdf = gdf.merge(csv_data, left_on='DHB2015_Co', right_on='DHB2015_code', how='left').dropna()
+    joined_gdf.set_geometry('geometry', inplace=True)
+except Exception as e:
+    logger.error(f"Error joining dataframes: {e}")
+    sys.exit(1)
+
+# Save the joined GeoDataFrame to a GeoPackage
+try:
+    joined_gdf.to_file(output_gpkg_path, layer='joined_data', driver="GPKG")
+    logger.info(f"Joined GeoDataFrame saved to GeoPackage: {output_gpkg_path}")
+except Exception as e:
+    logger.error(f"Error saving GeoDataFrame to GeoPackage: {e}")
+    sys.exit(1)
+
+# Load the GeoPackage layer into QGIS
+try:
+    joined_layer = QgsVectorLayer(f"{output_gpkg_path}|layername=joined_data", "joined_data", "ogr")
+    if not joined_layer.isValid():
+        logger.error(f"Failed to load joined data from GeoPackage. Check the file at {output_gpkg_path}")
+        sys.exit(1)
+    project.addMapLayer(joined_layer, False)
+    logger.info("Joined data table added to the project.")
+except Exception as e:
+    logger.error(f"Error loading GeoPackage layer into QGIS: {e}")
+    sys.exit(1)
+
+# Check for existing joins and remove them
+for join in dhb2015_layer.vectorJoins():
+    dhb2015_layer.removeJoin(join.joinLayerId())
+
+# Perform the join in QGIS
+try:
+    join_info = QgsVectorLayerJoinInfo()
+    join_info.setJoinLayer(joined_layer)
+    join_info.setJoinFieldName('DHB2015_code')
+    join_info.setTargetFieldName('DHB2015_Co')
+    join_info.setUsingMemoryCache(True)
+    dhb2015_layer.addJoin(join_info)
+except Exception as e:
+    logger.error(f"Error performing join in QGIS: {e}")
+    sys.exit(1)
+
+# Confirm that the join operation was successful
+if 'joined_data_Covid_Case' not in [field.name() for field in dhb2015_layer.fields()]:
+    logger.error("Error: joined_data_Covid_Case field not found. Join may have failed.")
+    sys.exit(1)
+
+# Check data in the Covid_Case field
+valid_data = []
+invalid_data = []
+for feature in dhb2015_layer.getFeatures():
+    value = feature['joined_data_Covid_Case']
+    try:
+        valid_data.append(float(value))
+    except (ValueError, TypeError):
+        invalid_data.append(value)
+
+logger.info(f"Valid data count: {len(valid_data)}")
+logger.info(f"Invalid data count: {len(invalid_data)}")
+logger.info(f"Sample of valid data: {valid_data[:5]}")
+logger.info(f"Sample of invalid data: {invalid_data[:5]}")
+
+# Create a basic graduated renderer
+field_name = 'joined_data_Covid_Case'
+min_value = min(valid_data)
+max_value = max(valid_data)
+classes = 5
+interval = (max_value - min_value) / classes
+color_ramp = QgsGradientColorRamp.create({'color1': '#ffeded', 'color2': '#ff0000'})
+
+ranges = []
+for i in range(classes):
+    lower = min_value + i * interval
+    upper = min_value + (i + 1) * interval
+    label = f"{int(lower)} - {int(upper)}"
+    symbol = QgsSymbol.defaultSymbol(dhb2015_layer.geometryType())
+    symbol.setColor(color_ramp.color(float(i) / classes))
+    ranges.append(QgsRendererRange(lower, upper, symbol, label))
+
+graduated_renderer = QgsGraduatedSymbolRenderer(field_name, ranges)
+graduated_renderer.setMode(QgsGraduatedSymbolRenderer.EqualInterval)
+dhb2015_layer.setRenderer(graduated_renderer)
+dhb2015_layer.triggerRepaint()
+
+# Save the project
+output_project_file_path = os.path.join(output_dir, "covid_case_copy.qgz")
+if project.write(output_project_file_path):
+    logger.info("Project saved successfully")
+else:
+    logger.error("Failed to save project")
+
+# Exit QGIS
+qgs.exitQgis()
+        </code></pre>
+    </div>
+</body>
+</html>
