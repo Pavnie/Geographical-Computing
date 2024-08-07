@@ -1,0 +1,22 @@
+Hosting link : 
+
+https://pavnie.github.io/Geographical-Computing-GISC425/HTML%20Guide/ArcGIS_guide.html
+
+https://pavnie.github.io/Geographical-Computing-GISC425/HTML%20Guide/Excel_quide.html
+
+https://pavnie.github.io/Geographical-Computing-GISC425/HTML%20Guide/QGIS_Automation.html
+
+https://pavnie.github.io/Geographical-Computing-GISC425/HTML%20Guide/SQL_GIS_Master.html
+
+https://pavnie.github.io/Geographical-Computing-GISC425/HTML%20Guide/PowerBI%20Guide.html
+
+https://pavine.shinyapps.io/open_street_map_dashboard_healthcare_project/
+
+
+Check the File Path:
+
+Ensure your HTML file is located at HTML Guide/ArcGIS_guide.html in your repository.
+URL Encoding:
+
+Spaces in URLs should be replaced with %20. So, HTML Guide becomes HTML%20Guide.
+
