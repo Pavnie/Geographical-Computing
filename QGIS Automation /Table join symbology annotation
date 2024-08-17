@@ -1,0 +1,165 @@
+import os
+import sys
+import logging
+from PyQt5.QtWidgets import QApplication
+from qgis.core import (
+    QgsApplication,
+    QgsProject,
+    QgsVectorLayer,
+    QgsDataSourceUri,
+    QgsVectorLayerJoinInfo,
+    QgsSymbol,
+    QgsGraduatedSymbolRenderer,
+    QgsRendererRange,
+    QgsGradientColorRamp
+)
+import pandas as pd
+import geopandas as gpd
+from PyQt5.QtGui import QColor
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Set the PROJ_LIB environment variable
+os.environ['PROJ_LIB'] = r'C:\Program Files\QGIS 3.34.8\share\proj'
+QgsApplication.setPrefixPath("C:/Program Files/QGIS 3.34.8", True)
+qgs = QgsApplication([], False)
+qgs.initQgis()
+app = QApplication(sys.argv)
+
+# Paths to the files
+project_file_path = r"C:\GIS\Projects\Automation Task\covid_case.qgz"
+output_dir = r"C:\GIS\Projects\Automation Task\VSC_files_generated"
+csv_file_path = r"C:\GIS\Projects\Automation Task\DHB2015.csv"
+shapefile_path = r"C:\GIS\Projects\Automation Task\DHB2015.shp"
+output_gpkg_path = os.path.join(output_dir, "DHB2015_joined.gpkg")
+
+# Load the project
+project = QgsProject.instance()
+if not project.read(project_file_path):
+    logger.error(f"Failed to read the project file: {project_file_path}")
+    sys.exit(1)
+
+# Load and process DHB2015 layer
+dhb2015_layer = next((layer for layer in project.mapLayers().values() if layer.name() == "DHB2015"), None)
+if dhb2015_layer is None:
+    logger.error("Failed to find the DHB2015 layer in the project")
+    sys.exit(1)
+
+# Load and preprocess CSV data
+try:
+    csv_data = pd.read_csv(csv_file_path)
+    csv_data['DHB2015_code'] = csv_data['DHB2015_code'].astype(str).str.zfill(2).str.strip()
+    csv_data = csv_data.drop_duplicates(subset=['DHB2015_code']).rename(columns={'Covid Case': 'Covid_Case'}).dropna()
+except Exception as e:
+    logger.error(f"Error processing CSV data: {e}")
+    sys.exit(1)
+
+logger.info("CSV data loaded and preprocessed")
+
+# Load the shapefile into a GeoDataFrame
+try:
+    gdf = gpd.read_file(shapefile_path)
+    gdf['DHB2015_Co'] = gdf['DHB2015_Co'].astype(str).str.zfill(2).str.strip()
+except Exception as e:
+    logger.error(f"Error loading shapefile: {e}")
+    sys.exit(1)
+
+logger.info("Shapefile data loaded")
+
+# Join the dataframes
+try:
+    joined_gdf = gdf.merge(csv_data, left_on='DHB2015_Co', right_on='DHB2015_code', how='left').dropna()
+    joined_gdf.set_geometry('geometry', inplace=True)
+except Exception as e:
+    logger.error(f"Error joining dataframes: {e}")
+    sys.exit(1)
+
+# Save the joined GeoDataFrame to a GeoPackage
+try:
+    joined_gdf.to_file(output_gpkg_path, layer='joined_data', driver="GPKG")
+    logger.info(f"Joined GeoDataFrame saved to GeoPackage: {output_gpkg_path}")
+except Exception as e:
+    logger.error(f"Error saving GeoDataFrame to GeoPackage: {e}")
+    sys.exit(1)
+
+# Load the GeoPackage layer into QGIS
+try:
+    joined_layer = QgsVectorLayer(f"{output_gpkg_path}|layername=joined_data", "joined_data", "ogr")
+    if not joined_layer.isValid():
+        logger.error(f"Failed to load joined data from GeoPackage. Check the file at {output_gpkg_path}")
+        sys.exit(1)
+    project.addMapLayer(joined_layer, False)
+    logger.info("Joined data table added to the project.")
+except Exception as e:
+    logger.error(f"Error loading GeoPackage layer into QGIS: {e}")
+    sys.exit(1)
+
+# Check for existing joins and remove them
+for join in dhb2015_layer.vectorJoins():
+    dhb2015_layer.removeJoin(join.joinLayerId())
+
+# Perform the join in QGIS
+try:
+    join_info = QgsVectorLayerJoinInfo()
+    join_info.setJoinLayer(joined_layer)
+    join_info.setJoinFieldName('DHB2015_code')
+    join_info.setTargetFieldName('DHB2015_Co')
+    join_info.setUsingMemoryCache(True)
+    dhb2015_layer.addJoin(join_info)
+except Exception as e:
+    logger.error(f"Error performing join in QGIS: {e}")
+    sys.exit(1)
+
+# Confirm that the join operation was successful
+if 'joined_data_Covid_Case' not in [field.name() for field in dhb2015_layer.fields()]:
+    logger.error("Error: joined_data_Covid_Case field not found. Join may have failed.")
+    sys.exit(1)
+
+# Check data in the Covid_Case field
+valid_data = []
+invalid_data = []
+for feature in dhb2015_layer.getFeatures():
+    value = feature['joined_data_Covid_Case']
+    try:
+        valid_data.append(float(value))
+    except (ValueError, TypeError):
+        invalid_data.append(value)
+
+logger.info(f"Valid data count: {len(valid_data)}")
+logger.info(f"Invalid data count: {len(invalid_data)}")
+logger.info(f"Sample of valid data: {valid_data[:5]}")
+logger.info(f"Sample of invalid data: {invalid_data[:5]}")
+
+# Create a basic graduated renderer
+field_name = 'joined_data_Covid_Case'
+min_value = min(valid_data)
+max_value = max(valid_data)
+classes = 5
+interval = (max_value - min_value) / classes
+color_ramp = QgsGradientColorRamp.create({'color1': '#ffeded', 'color2': '#ff0000'})
+
+ranges = []
+for i in range(classes):
+    lower = min_value + i * interval
+    upper = min_value + (i + 1) * interval
+    label = f"{int(lower)} - {int(upper)}"
+    symbol = QgsSymbol.defaultSymbol(dhb2015_layer.geometryType())
+    symbol.setColor(color_ramp.color(float(i) / classes))
+    ranges.append(QgsRendererRange(lower, upper, symbol, label))
+
+graduated_renderer = QgsGraduatedSymbolRenderer(field_name, ranges)
+graduated_renderer.setMode(QgsGraduatedSymbolRenderer.EqualInterval)
+dhb2015_layer.setRenderer(graduated_renderer)
+dhb2015_layer.triggerRepaint()
+
+# Save the project
+output_project_file_path = os.path.join(output_dir, "covid_case_copy.qgz")
+if project.write(output_project_file_path):
+    logger.info("Project saved successfully")
+else:
+    logger.error("Failed to save project")
+
+# Exit QGIS
+qgs.exitQgis()
