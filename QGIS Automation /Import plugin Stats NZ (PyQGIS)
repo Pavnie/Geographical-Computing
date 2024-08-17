@@ -1,1 +1,153 @@
+import sys
+import os
+import time
+from qgis.core import QgsApplication, QgsMessageLog, Qgis, QgsProject, QgsVectorLayer
+from qgis.gui import QgsMapCanvas
+from PyQt5.QtWidgets import QApplication
+import requests
+
+# Add user plugins directory
+user_plugins_path = 'C:/Users/Pawaneet Kaur/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins'
+sys.path.append(user_plugins_path)
+print("Plugin path added:", user_plugins_path)
+
+# Check if the user plugins directory exists and list its contents
+if os.path.exists(user_plugins_path):
+    print(f"User plugins directory exists: {user_plugins_path}")
+    print("Contents of user plugins directory:", os.listdir(user_plugins_path))
+else:
+    print(f"User plugins directory does not exist: {user_plugins_path}")
+
+# Initialize QGIS Application
+qgis_path = 'C:/Program Files/QGIS 3.34.8/apps/qgis-ltr'  # Adjust path as needed
+QgsApplication.setPrefixPath(qgis_path, True)
+app = QApplication([])
+qgis_app = QgsApplication([], False)
+qgis_app.initQgis()
+print("QGIS application initialized.")
+
+# Function to log messages
+def log_message(message, tag):
+    QgsMessageLog.logMessage(message, tag, Qgis.Info)
+    print(f"{tag}: {message}")
+
+# Log environment setup
+log_message("QGIS environment set up correctly.", "Initialization")
+
+# Add a delay to ensure plugins are fully loaded
+time.sleep(5)  # Wait for 5 seconds
+
+# List all available plugins
+from qgis.utils import plugins, loadPlugin, startPlugin
+
+log_message("Attempting to list all available plugins:", "Plugins")
+print("Available plugins:")
+if not plugins:
+    log_message("No plugins found. The plugins dictionary is empty.", "Plugins")
+else:
+    for key in plugins:
+        print(key)
+        log_message(f"Plugin found: {key}", "Plugins")
+
+# Manually load and activate the LINZ Data Importer plugin if available
+linz_plugin_name = 'linz-data-importer'
+
+def activate_plugin(plugin_name):
+    if plugin_name in plugins:
+        log_message(f"{plugin_name} is already loaded.", "Plugins")
+        startPlugin(plugin_name)
+        log_message(f"{plugin_name} plugin started.", "Plugins")
+    else:
+        log_message(f"Trying to load {plugin_name} manually.", "Plugins")
+        loadPlugin(plugin_name)
+        startPlugin(plugin_name)
+        log_message(f"{plugin_name} plugin loaded and started.", "Plugins")
+
+activate_plugin(linz_plugin_name)
+
+# Function to add and validate layer
+def add_wfs_layer():
+    api_key = "a58110784a224e71b786b421567d8a3c"
+    capabilities_url = f"https://datafinder.stats.govt.nz/services;key={api_key}/wfs?service=WFS&request=GetCapabilities"
+    print(f"Capabilities URL: {capabilities_url}")  # Print the capabilities URL for debugging
+
+    try:
+        response = requests.get(capabilities_url)
+        response.raise_for_status()
+        log_message("Successfully accessed WFS Capabilities.", "Capabilities")
+    except requests.RequestException as e:
+        log_message(f"Failed to access WFS Capabilities: {e}", "Capabilities")
+        return False
+
+    # Use the correct layer name format
+    layer_url = f"https://datafinder.stats.govt.nz/services;key={api_key}/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=datafinder.stats.govt.nz:layer-111198"
+    print(f"Layer URL: {layer_url}")  # Print the layer URL for debugging
+
+    layer = QgsVectorLayer(layer_url, "Urban Rural 2023 (generalised)", "WFS")
+
+    if not layer.isValid():
+        log_message("Failed to load Urban Rural 2023 (generalised) layer. Check the URL and API key.", "Layer")
+        return False
+    else:
+        log_message("Successfully loaded Urban Rural 2023 (generalised) layer.", "Layer")
+        QgsProject.instance().addMapLayer(layer)
+        return layer
+
+# Attempt to add the WFS layer
+layer = add_wfs_layer()
+
+if layer:
+    log_message("Layer successfully added to the project. Zooming to layer extent.", "Layer")
+
+    # Get the map canvas
+    canvas = QgsMapCanvas()
+    canvas.setLayers([layer])
+    canvas.setExtent(layer.extent())
+    canvas.refresh()
+
+    log_message(f"Zoomed to layer extent: {layer.extent().toString()}", "Layer Zoom")
+else:
+    log_message("Layer could not be added to the project. Skipping zoom.", "Layer")
+
+# Check if any layers are present in the QGIS project
+project = QgsProject.instance()
+layers = project.mapLayers()
+if layers:
+    log_message("Layers are present in the QGIS project.", "Layer Check")
+    for layer_id, layer in layers.items():
+        log_message(f"Layer ID: {layer_id}, Layer Name: {layer.name()}", "Layer Check")
+else:
+    log_message("No layers found in the QGIS project.", "Layer Check")
+
+# Save the project (optional)
+project_path = r"C:\Users\Pawaneet Kaur\Desktop\project.qgz"  # Adjust path as needed
+project.write(project_path)
+log_message(f"Project saved at {project_path}", "Project")
+
+## Function to save layer as shapefile in a new folder
+#def save_layer_as_shapefile(layer):
+#    # Create a new folder to save the shapefile
+#    output_folder = r"C:\Users\Pawaneet Kaur\Desktop\QGIS_Shapefile_Output"
+#    if not os.path.exists(output_folder):
+#        os.makedirs(output_folder)
+#        log_message(f"Created new folder for shapefile: {output_folder}", "Output Folder")
+#
+#    # Define the shapefile path
+#    shapefile_path = os.path.join(output_folder, "Urban_Rural_2023_generalised.shp")
+#
+#    # Save the layer as a shapefile
+#    options = QgsVectorFileWriter.SaveVectorOptions()
+#    options.driverName = "ESRI Shapefile"
+#    res, err = QgsVectorFileWriter.writeAsVectorFormat(layer, shapefile_path, options)
+#    if res == QgsVectorFileWriter.NoError:
+#        log_message(f"Shapefile saved successfully at {shapefile_path}", "Shapefile Save")
+#    else:
+#        log_message(f"Error saving shapefile: {err}", "Shapefile Save Error")
+#
+# if layer:
+#     save_layer_as_shapefile(layer)
+
+# Shutting down QGIS application
+log_message("Shutting down QGIS application", "Shutdown")
+qgis_app.exitQgis()
 
